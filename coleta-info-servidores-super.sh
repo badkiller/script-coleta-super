@@ -27,7 +27,7 @@ Ajuda() {
   echo ""
   echo " Onde:"
   echo ""
-  echo " 1 - Coletar dados - Apache/HTTPD/PHP"
+  echo " 1 - Coletar dados - Apache/HTTPD/PHP e SEI/Super"
   echo " 2 - Coletar dados - Memcached"
   echo " 3 - Coletar dados - Solr 8.2"
   echo ""
@@ -109,6 +109,23 @@ echo "+-+-+-+-+-+-+-+-+-+-+-+-+-+" >> /tmp/analise/httpd/php.log
 php -m >> /tmp/analise/httpd/php.log
 echo "+-+-+-+-+-+-+-+-+-+-+-+-+-+" >> /tmp/analise/httpd/php.log
 php -i >> /tmp/analise/httpd/php.log
+
+debug 2 "Coletando informações do Aplicacao SEI/SIP"
+mkdir -p /tmp/analise/app/
+
+#Coleta a configuração dos arquivos principais da aplicação retirando dados sensiveis (senhas)
+grep -v "Senha" /fontes/sei/config/ConfiguracaoSEI.php > /tmp/analise/app/config-sei.log
+grep -v "Senha" /fontes/sip/config/ConfiguracaoSip.php > /tmp/analise/app/config-sip.log
+
+# Coleta informações de permissões dos arquivos da aplicação
+ls -lR /fontes/s* /fontes/infra* > /tmp/analise/app/list-files-perm-app.log
+ls -lR /dados/ > /tmp/analise/app/list-files-perm-anexos.log
+
+# Coleta informações do ffmpeg
+ffmpeg -version > /tmp/analise/app/ffmpeg.log
+
+# Coleta informações do wkhtmltopdf
+wkhtmltopdf --version > /tmp/analise/app/wkhtmltopdf.log
 }
 
 Memcached () {
@@ -127,26 +144,6 @@ mkdir -p /tmp/analise/java/
 
 # Coleta informações do Java
 java -version > /tmp/analise/java/java-version.log
-}
-
-Aplicacao () {
-debug 2 "Coletando informações do Aplicacao SEI/SIP"
-mkdir -p /tmp/analise/app/
-
-#Coleta a configuração dos arquivos principais da aplicação retirando dados sensiveis (senhas)
-grep -v "senha" /fontes/sei/config/ConfiguracaoSEI.php > /tmp/analise/app/config-sei.log
-grep -v "senha" /fontes/sip/config/ConfiguracaoSip.php > /tmp/analise/app/config-sip.log
-
-# Coleta informações de permissões dos arquivos da aplicação
-ls -lR /fontes/s* /fontes/infra* > /tmp/analise/app/list-files-perm-app.log
-ls -lR /dados/ > /tmp/analise/app/list-files-perm-anexos.log
-
-# Coleta informações do ffmpeg
-ffmpeg -version > /tmp/analise/app/ffmpeg.log
-
-# Coleta informações do wkhtmltopdf
-wkhtmltopdf --version > /tmp/analise/app/wkhtmltopdf.log
-
 }
 
 ###############################################################################
@@ -179,7 +176,7 @@ if [ $vSERVICO -lt 5 ]; then
 fi
 
 case "$vSERVICO" in
-   1) Apache 
+   1) Apache
    ;;
    2) Memcached
    ;;
