@@ -62,10 +62,11 @@ debug () {
 }
 
 SistemaOperacional () {
-debug 2 "Coletando informações do Sistema Operacion"
+debug 2 "Coletando informações do Sistema Operacional"
 
 mkdir -p /tmp/analise/so/{selinux,sysconfig}
 
+# Coleta informações do S.O. para analise e melhorias (tuning)
 cp -a /etc/redhat-release /tmp/analise/so/
 cp -a /etc/fstab /tmp/analise/so/
 cp -a /etc/sysctl.conf /tmp/analise/so/
@@ -90,10 +91,11 @@ systemctl list-unit-files --state=enabled > /tmp/analise/so/systemctl-enabled.lo
 }
 
 Apache () {
-debug 2 "Coletando informações do Apache/HTT"
+debug 2 "Coletando informações do Apache/HTTPD"
 
 mkdir -p /tmp/analise/httpd
 
+# Coleta informações dos principais componentes do Apache e PHP para analise
 cp -a /etc/php.ini /tmp/analise/httpd/
 cp -a /etc/php.d /tmp/analise/httpd/
 cp -a /etc/php-fpm.conf /tmp/analise/httpd/
@@ -110,30 +112,41 @@ php -i >> /tmp/analise/httpd/php.log
 }
 
 Memcached () {
-debug 2 "Coletando informações do Memcach"
+debug 2 "Coletando informações do Memcached"
 
 mkdir -p /tmp/analise/memcached/
 
+# Coleta configurações do Memcached
 cp -a /etc/sysconfig/memcached /tmp/analise/memcached/
 }
 
 Java () {
-debug 2 "Coletando informações do Ja"
+debug 2 "Coletando informações do Java"
 
 mkdir -p /tmp/analise/java/
 
+# Coleta informações do Java
 java -version > /tmp/analise/java/java-version.log
 }
 
 Aplicacao () {
-debug 2 "Coletando informações do Aplicacao SEIIP"
+debug 2 "Coletando informações do Aplicacao SEI/SIP"
 mkdir -p /tmp/analise/app/
 
+#Coleta a configuração dos arquivos principais da aplicação retirando dados sensiveis (senhas)
 grep -v "senha" /fontes/sei/config/ConfiguracaoSEI.php > /tmp/analise/app/config-sei.log
 grep -v "senha" /fontes/sip/config/ConfiguracaoSip.php > /tmp/analise/app/config-sip.log
 
-ls -la /fontes/*/*/* > /tmp/analise/app/list-files-perm-app.log
-ls -la /dados/*/*/* > /tmp/analise/app/list-files-perm-anexos.log
+# Coleta informações de permissões dos arquivos da aplicação
+ls -lR /fontes/s* /fontes/infra* > /tmp/analise/app/list-files-perm-app.log
+ls -lR /dados/ > /tmp/analise/app/list-files-perm-anexos.log
+
+# Coleta informações do ffmpeg
+ffmpeg -version > /tmp/analise/app/ffmpeg.log
+
+# Coleta informações do wkhtmltopdf
+wkhtmltopdf --version > /tmp/analise/app/wkhtmltopdf.log
+
 }
 
 ###############################################################################
@@ -160,13 +173,13 @@ debug 1 "Iniciando a execução dos procedimentos"
 if [ $vSERVICO -lt 5 ]; then
    SistemaOperacional
    if [ $? -ne 0 ]; then
-      alerta "Houve erro na instalação dos pacotes padrão"
+      alerta "Houve um erro, por favor enviar o resultado."
       exit 1
    fi
 fi
 
 case "$vSERVICO" in
-   1) Apache
+   1) Apache 
    ;;
    2) Memcached
    ;;
@@ -176,10 +189,16 @@ case "$vSERVICO" in
       exit 1
    ;;
 esac
-debug 1 "Fim da execução dos procedimentos"
 
 ## Compactar tudo do /tmp/analise
 tar zcf analise-$(hostname)-$(date +'%s').tgz /tmp/analise
 
+  echo ""
+  echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
+  echo "   Encaminhar o arquivo analise-$(hostname)-$(date +'%s').tgz para analise.
+  echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
+  echo ""
+
+debug 1 "Fim da execução dos procedimentos"
 #Fim
 
