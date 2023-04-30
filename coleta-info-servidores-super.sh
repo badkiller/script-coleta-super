@@ -229,7 +229,7 @@ rm -rf /tmp/analise
 echo ""
 echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
 echo "   Encaminhar o arquivo abaixo para analise."
-echo "   analise-$(hostname)-$(date +'%s')"
+echo "   analise-$(hostname)-*.tgz"
 echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
 echo ""
 
