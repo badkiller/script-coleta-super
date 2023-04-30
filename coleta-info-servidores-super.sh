@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# Script ..: analiser-dados-super.sh
+# Script ..: coleta-info-servidores-super.sh
 # Descrição: Coletar dados/parametros do sistema operacional e aplicacao SEI/Super
 # Autor ...: Eugenio Oliveira/Tadeu Rocha
 # Data/hora: 28/04/2023 15:30h
 
 # Definição de variaveis globais
-vDEBUG=1
+vDEBUG=0
 vSERVICO=0
 
 #########################################################################
@@ -32,7 +32,7 @@ Ajuda() {
   echo " 3 - Coletar dados - Solr 8.2"
   echo ""
   echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
-  echo "                                      	Autor: EAO/TR"
+  echo "                                        Autor: EAO/TR"
 }
 
 #########################################################################
@@ -41,26 +41,27 @@ Ajuda() {
 #
 debug () {
 
-	if [ "$vDEBUG" -ne "0" ] ; then
+        if [ "$vDEBUG" -ne "0" ] ; then
 
-   	case $1 in
-        	1) echo -e "[+] $2" >&2
-        	;;
-        	2) echo -e "	[-] $2" >&2
-        	;;
-        	3) echo -e "    	[*] $2" >&2
-        	;;
-        	4) echo -e "        	[#] $2" >&2
-        	;;
-        	5) echo -e "            	[x] $2" >&2
-        	;;
-        	*) echo -e "[+] $*" >&2
-        	;;
-   	esac
+        case $1 in
+                1) echo -e "[+] $2" >&2
+                ;;
+                2) echo -e "    [-] $2" >&2
+                ;;
+                3) echo -e "        [*] $2" >&2
+                ;;
+                4) echo -e "            [#] $2" >&2
+                ;;
+                5) echo -e "                [x] $2" >&2
+                ;;
+                *) echo -e "[+] $*" >&2
+                ;;
+        esac
 
-	fi
+        fi
 }
 
+########################################################
 SistemaOperacional () {
 debug 2 "Coletando informações do Sistema Operacional"
 
@@ -72,6 +73,7 @@ cp -a /etc/fstab /tmp/analise/so/
 cp -a /etc/sysctl.conf /tmp/analise/so/
 cp -a /etc/sysctl.d /tmp/analise/so/
 cp -a /etc/security /tmp/analise/so/
+cp -a /etc/hosts /tmp/analise/so/
 cp -a /etc/selinux/config /tmp/analise/so/selinux/
 lsblk > /tmp/analise/so/disks.log
 fdisk -l > /tmp/analise/so/partitions-list.log
@@ -90,6 +92,7 @@ sysctl -a > /tmp/analise/so/sysctl-conf.log
 systemctl list-unit-files --state=enabled > /tmp/analise/so/systemctl-enabled.log
 }
 
+########################################################
 Apache () {
 debug 2 "Coletando informações do Apache/HTTPD"
 
@@ -110,7 +113,7 @@ php -m >> /tmp/analise/httpd/php.log
 echo "+-+-+-+-+-+-+-+-+-+-+-+-+-+" >> /tmp/analise/httpd/php.log
 php -i >> /tmp/analise/httpd/php.log
 
-debug 2 "Coletando informações do Aplicacao SEI/SIP"
+debug 2 "Coletando informações da Aplicacao SEI/SIP"
 mkdir -p /tmp/analise/app/
 
 #Coleta a configuração dos arquivos principais da aplicação retirando dados sensiveis (senhas)
@@ -119,7 +122,11 @@ grep -v "Senha" /fontes/sip/config/ConfiguracaoSip.php > /tmp/analise/app/config
 
 # Coleta informações de permissões dos arquivos da aplicação
 ls -lR /fontes/s* /fontes/infra* > /tmp/analise/app/list-files-perm-app.log
-ls -lR /dados/ > /tmp/analise/app/list-files-perm-anexos.log
+
+vDADOS=$(grep RepositorioArquivos /fontes/sei/config/ConfiguracaoSEI.php | awk -F"'" '{print $4}')
+if [ "$vDADOS" ] ; then
+   ls -lR $vDADOS > /tmp/analise/app/list-files-perm-anexos.log
+fi
 
 # Coleta informações do ffmpeg
 ffmpeg -version > /tmp/analise/app/ffmpeg.log
@@ -128,6 +135,7 @@ ffmpeg -version > /tmp/analise/app/ffmpeg.log
 wkhtmltopdf --version > /tmp/analise/app/wkhtmltopdf.log
 }
 
+########################################################
 Memcached () {
 debug 2 "Coletando informações do Memcached"
 
@@ -137,6 +145,7 @@ mkdir -p /tmp/analise/memcached/
 cp -a /etc/sysconfig/memcached /tmp/analise/memcached/
 }
 
+########################################################
 Java () {
 debug 2 "Coletando informações do Java"
 
@@ -145,6 +154,30 @@ mkdir -p /tmp/analise/java/
 # Coleta informações do Java
 java -version > /tmp/analise/java/java-version.log
 }
+
+########################################################
+Solr () {
+
+debug 2 "Coletando informações do Solr"
+
+mkdir -p /tmp/analise/solr/{sei-protocolos,sei-publicacoes,sei-bases-conhecimento}/conf
+
+cp -a /etc/default/solr.in.sh /tmp/analise/solr
+
+cp -a /dados/sei-protocolos/core.properties /tmp/analise/solr/sei-protocolos
+cp -a /dados/sei-protocolos/conf/schema.xml /tmp/analise/solr/sei-protocolos/conf
+cp -a /dados/sei-protocolos/conf/solrconfig.xml /tmp/analise/solr/sei-protocolos/conf
+
+cp -a /dados/sei-publicacoes/core.properties /tmp/analise/solr/sei-publicacoes
+cp -a /dados/sei-publicacoes/conf/schema.xml /tmp/analise/solr/sei-publicacoes/conf
+cp -a /dados/sei-publicacoes/conf/solrconfig.xml /tmp/analise/solr/sei-publicacoes/conf
+
+cp -a /dados/sei-bases-conhecimento/core.properties /tmp/analise/solr/sei-bases-conhecimento/
+cp -a /dados/sei-bases-conhecimento/conf/schema.xml /tmp/analise/solr/sei-bases-conhecimento/conf
+cp -a /dados/sei-bases-conhecimento/conf/solrconfig.xml /tmp/analise/solr/sei-bases-conhecimento/conf
+
+}
+
 
 ###############################################################################
 # Inicio do processo de analise
@@ -188,14 +221,17 @@ case "$vSERVICO" in
 esac
 
 ## Compactar tudo do /tmp/analise
-tar zcf analise-$(hostname)-$(date +'%s').tgz /tmp/analise
+tar zcf analise-$(hostname)-$(date +'%s').tgz /tmp/analise > /dev/null 2>&1
 
-  echo ""
-  echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
-  echo "   Encaminhar o arquivo analise-$(hostname)-$(date +'%s').tgz para analise.
-  echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
-  echo ""
+# Remove pasta utilizada
+rm -rf /tmp/analise
+
+echo ""
+echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
+echo "   Encaminhar o arquivo abaixo para analise."
+echo "   analise-$(hostname)-$(date +'%s')"
+echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
+echo ""
 
 debug 1 "Fim da execução dos procedimentos"
 #Fim
-
