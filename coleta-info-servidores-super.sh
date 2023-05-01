@@ -10,10 +10,9 @@ vDEBUG=0
 vSERVICO=0
 
 #########################################################################
-# Função de Ajuda
+# Função Ajuda
 # Mostra as opções do script de analise de dados
 #
-
 Ajuda() {
 
   echo ""
@@ -30,6 +29,7 @@ Ajuda() {
   echo " 1 - Coletar dados - Apache/HTTPD/PHP e SEI/Super"
   echo " 2 - Coletar dados - Memcached"
   echo " 3 - Coletar dados - Solr 8.2"
+  echo " 4 - Coletar dados - Nginx (Balanceador de carga)"
   echo ""
   echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
   echo "                                        Autor: EAO/TR"
@@ -61,20 +61,30 @@ debug () {
         fi
 }
 
-########################################################
+#########################################################################
+# Função SistemaOperacional
+# Coleta as informações do Sistema Operacional
+#
 SistemaOperacional () {
 debug 2 "Coletando informações do Sistema Operacional"
 
 mkdir -p /tmp/analise/so/{selinux,sysconfig}
 
 # Coleta informações do S.O. para analise e melhorias (tuning)
-cp -a /etc/redhat-release /tmp/analise/so/
+if [ $vSERVICO -ne 4 ] ; then
+   cp -a /etc/redhat-release /tmp/analise/so/
+   cp -a /etc/selinux/config /tmp/analise/so/selinux/
+   vHOSTNAME=$(hostname -i)
+else
+   vHOSTNAME=$(hostname -I)
+fi
+cp -a /etc/os-release /tmp/analise/so/
 cp -a /etc/fstab /tmp/analise/so/
 cp -a /etc/sysctl.conf /tmp/analise/so/
 cp -a /etc/sysctl.d /tmp/analise/so/
 cp -a /etc/security /tmp/analise/so/
 cp -a /etc/hosts /tmp/analise/so/
-cp -a /etc/selinux/config /tmp/analise/so/selinux/
+cp -a /etc/machine-id /tmp/analise/so/
 lsblk > /tmp/analise/so/disks.log
 fdisk -l > /tmp/analise/so/partitions-list.log
 mount > /tmp/analise/so/mounts-list.logg
@@ -87,12 +97,24 @@ cp -a /etc/default /tmp/analise/so/
 ps axf > /tmp/analise/so/process-list.log
 cp -a /etc/crontab /tmp/analise/so/crontab.log
 cat /proc/cpuinfo > /tmp/analise/so/cpuinfo.log
+cat /proc/meminfo > /tmp/analise/so/meminfo.log
 rpm -qa > /tmp/analise/so/packages.log
 sysctl -a > /tmp/analise/so/sysctl-conf.log
 systemctl list-unit-files --state=enabled > /tmp/analise/so/systemctl-enabled.log
+
+cd /sys/class/net
+for vINTERFACE in $(ls -1|grep -v lo) ; do 
+    echo "$vINTERFACE;$vHOSTNAME;$(cat $vINTERFACE/address);$(cat $vINTERFACE/speed);$(cat $vINTERFACE/duplex);$(cat $vINTERFACE/mtu)" >> /tmp/analise/so/interfaces.log
+done
+
+vmstat 1 30 > /tmp/analise/so/vmstat.log
+
 }
 
-########################################################
+#########################################################################
+# Função Apache
+# Coleta as informações do Serviço do Apache e do SEI/SIP
+#
 Apache () {
 debug 2 "Coletando informações do Apache/HTTPD"
 
@@ -113,7 +135,11 @@ php -m >> /tmp/analise/httpd/php.log
 echo "+-+-+-+-+-+-+-+-+-+-+-+-+-+" >> /tmp/analise/httpd/php.log
 php -i >> /tmp/analise/httpd/php.log
 
-debug 2 "Coletando informações da Aplicacao SEI/SIP"
+cat /proc/$(ps axu|grep '/usr/sbin/httpd'|grep root|grep -v grep|awk '{print $2}')/limits > /tmp/analise/httpd/limits.log
+echo "+-+-+-+-+-+-+-+-+-+-+-+-+-+" >> /tmp/analise/httpd/limits.log
+cat /proc/$(ps axu|grep '/usr/sbin/httpd'|grep apache|grep -v grep|head -1|awk '{print $2}')/limits >> /tmp/analise/httpd/limits.log
+
+debug 3 "Coletando informações da Aplicacao SEI/SIP"
 mkdir -p /tmp/analise/app/
 
 #Coleta a configuração dos arquivos principais da aplicação retirando dados sensiveis (senhas)
@@ -133,9 +159,13 @@ ffmpeg -version > /tmp/analise/app/ffmpeg.log
 
 # Coleta informações do wkhtmltopdf
 wkhtmltopdf --version > /tmp/analise/app/wkhtmltopdf.log
+
 }
 
-########################################################
+#########################################################################
+# Função Memcached
+# Coleta as informações do Serviço do Memcached
+#
 Memcached () {
 debug 2 "Coletando informações do Memcached"
 
@@ -143,19 +173,27 @@ mkdir -p /tmp/analise/memcached/
 
 # Coleta configurações do Memcached
 cp -a /etc/sysconfig/memcached /tmp/analise/memcached/
+
 }
 
-########################################################
+#########################################################################
+# Função Java
+# Coleta as informações do Java
+#
 Java () {
 debug 2 "Coletando informações do Java"
 
 mkdir -p /tmp/analise/java/
 
 # Coleta informações do Java
-java -version > /tmp/analise/java/java-version.log
+java -version 2> /tmp/analise/java/java-version.log
+
 }
 
-########################################################
+#########################################################################
+# Função Solr
+# Coleta as informações do Serviço do Memcached
+#
 Solr () {
 
 debug 2 "Coletando informações do Solr"
@@ -178,6 +216,18 @@ cp -a /dados/sei-bases-conhecimento/conf/solrconfig.xml /tmp/analise/solr/sei-ba
 
 }
 
+#########################################################################
+# Função Nginx
+# Coleta as informações do Serviço do Nginx
+#
+Nginx () {
+
+debug 2 "Coletando informações do nginx"
+
+cp -a /etc/nginx /tmp/analise/
+
+}
+
 
 ###############################################################################
 # Inicio do processo de analise
@@ -185,6 +235,7 @@ cp -a /dados/sei-bases-conhecimento/conf/solrconfig.xml /tmp/analise/solr/sei-ba
 
 #clear
 vSERVICO=$1
+vPWD=$(pwd)
 
 if [ -z "$vSERVICO" ]; then Ajuda ; exit ; fi
 if [ "$2" = "debug" ]; then vDEBUG=1 ; fi
@@ -209,27 +260,32 @@ if [ $vSERVICO -lt 5 ]; then
 fi
 
 case "$vSERVICO" in
-   1) Apache
+   1) Apache ; Java
    ;;
    2) Memcached
    ;;
-   3) Solr
+   3) Solr ; Java
+   ;;
+   4) Nginx
    ;;
    *) Ajuda
       exit 1
    ;;
 esac
 
-## Compactar tudo do /tmp/analise
-tar zcf analise-$(hostname)-$(date +'%s').tgz /tmp/analise > /dev/null 2>&1
+cd $vPWD
+vARQUIVO="analise-$(hostname)-$(date +'%s').tgz"
 
-# Remove pasta utilizada
+debug 2 "Compactando tudo do /tmp/analise"
+tar zcf $vARQUIVO /tmp/analise > /dev/null 2>&1
+
+debug 2 "Removendo diretorio temporário utilizado"
 rm -rf /tmp/analise
 
 echo ""
 echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
 echo "   Encaminhar o arquivo abaixo para analise."
-echo "   analise-$(hostname)-*.tgz"
+echo "   $vARQUIVO"
 echo " +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
 echo ""
 
